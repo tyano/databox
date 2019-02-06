@@ -1,6 +1,6 @@
-(ns box.core-test
+(ns databox.core-test
   (:require [clojure.test :refer :all]
-            [box.core :as box]
+            [databox.core :as box]
             [clojure.string :refer [upper-case]]))
 
 (deftest map-test
@@ -122,3 +122,24 @@
            (sequence (box/filter some?) [(box/success :a)
                                          (box/success nil)
                                          (box/success :b)])))))
+
+
+(deftest distinct-test
+  (testing "duplicated data must be removed"
+    (is (= [(box/success 1) (box/success 2) (box/success 3)]
+           (sequence (box/distinct) [1 1 1 2 1 3 2 3 1 2])))))
+
+(deftest distinct-by-test
+  (testing "data must be removed if the result of f is duplicated."
+    (is (= [(box/success {:data 1 :type :one})
+            (box/success {:data 1 :type :two})
+            (box/success {:data 3 :type :three})]
+           (sequence (box/distinct-by :type)
+                     [{:data 1 :type :one}
+                      {:data 2 :type :one}
+                      {:data 3 :type :one}
+                      {:data 1 :type :two}
+                      {:data 2 :type :two}
+                      {:data 3 :type :one}
+                      {:data 3 :type :two}
+                      {:data 3 :type :three}])))))

@@ -1,23 +1,30 @@
-(ns box.core
-  (:refer-clojure :exclude [map mapcat filter])
+(ns databox.core
+  (:refer-clojure :exclude [map mapcat filter distinct])
   (:require [clojure.core :as core]
             [clojure.pprint :refer [simple-dispatch]]))
 
 (declare map* mapcat* value failure unbox box? failure? success-value)
 
+
+(defn- handle-boxed-data
+  [boxed-data]
+  (case type
+    :success
+    (:result boxed-data)
+
+    :failure
+    (throw (ex-info "Unboxed a failed result."
+                    (dissoc boxed-data :type :exception)
+                    (:exception boxed-data)))))
+
 (defrecord Box
   [type]
 
   clojure.lang.IDeref
-  (deref [box]
-    (case type
-      :success
-      (:result box)
+  (deref [box] (handle-boxed-data box))
 
-      :failure
-      (throw (ex-info "Unboxed a failed result."
-                      (dissoc box :type :exception)
-                      (:exception box))))))
+  clojure.lang.IBlockingDeref
+  (deref [box ms timeout-value] (handle-boxed-data box)))
 
 (defn map
   [data & args]
@@ -85,6 +92,46 @@
 
          :else
          result)))))
+
+(defn distinct
+  []
+  (fn [rf]
+    (let [seen (volatile! #{})]
+      (fn
+        ([] (rf))
+        ([result] (rf result))
+        ([result input]
+         (cond
+           (failure? input)
+           (rf result input)
+
+           :else
+           (let [boxed (value input)
+                 v (success-value boxed)]
+             (if (contains? @seen v)
+               result
+               (do (vswap! seen conj v)
+                   (rf result boxed))))))))))
+
+(defn distinct-by
+  [f]
+  (fn [rf]
+    (let [seen (volatile! #{})]
+      (fn
+        ([] (rf))
+        ([result] (rf result))
+        ([result input]
+         (cond
+           (failure? input)
+           (rf result input)
+
+           :else
+           (let [boxed (value input)
+                 v (f (success-value boxed))]
+             (if (contains? @seen v)
+               result
+               (do (vswap! seen conj v)
+                   (rf result boxed))))))))))
 
 
 (prefer-method print-method Box clojure.lang.IDeref)
