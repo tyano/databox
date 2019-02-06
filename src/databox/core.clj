@@ -1,5 +1,5 @@
 (ns databox.core
-  (:refer-clojure :exclude [map mapcat filter])
+  (:refer-clojure :exclude [map mapcat filter distinct])
   (:require [clojure.core :as core]
             [clojure.pprint :refer [simple-dispatch]]))
 
