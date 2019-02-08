@@ -8,7 +8,7 @@
 
 (defn- handle-boxed-data
   [boxed-data]
-  (case type
+  (case (:type boxed-data)
     :success
     (:result boxed-data)
 
