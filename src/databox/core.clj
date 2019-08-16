@@ -133,14 +133,8 @@
                (do (vswap! seen conj v)
                    (rf result boxed))))))))))
 
-
-(prefer-method print-method Box clojure.lang.IDeref)
-(prefer-method print-method clojure.lang.IRecord clojure.lang.IDeref)
-(prefer-method print-method clojure.lang.IPersistentMap clojure.lang.IDeref)
-
-(prefer-method simple-dispatch Box clojure.lang.IDeref)
-(prefer-method simple-dispatch clojure.lang.IRecord clojure.lang.IDeref)
-(prefer-method simple-dispatch clojure.lang.IPersistentMap clojure.lang.IDeref)
+(prefer-method print-method java.util.Map clojure.lang.IDeref)
+(prefer-method simple-dispatch java.util.Map clojure.lang.IDeref)
 
 (defn success
   [value]
