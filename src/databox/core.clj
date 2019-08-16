@@ -186,7 +186,7 @@
   (= (:type box) :failure))
 
 
-(defn- stlip-default-keys
+(defn strip-default-keys
   [boxed]
   (dissoc boxed :type :result :exception))
 
@@ -203,14 +203,14 @@
         ;; we must keep keys assigned on a original boxed value.
         ;; so remove all default keys of Boxed instance from a original
         ;; boxed value and merge a new boxed instance on it.
-        (-> (stlip-default-keys boxed)
+        (-> (strip-default-keys boxed)
             (merge r)
             (map->Box)))
 
       (catch Throwable th
         (if throw?
           (throw th)
-          (-> (stlip-default-keys boxed)
+          (-> (strip-default-keys boxed)
               (merge (failure th))
               (map->Box)))))))
 
@@ -227,7 +227,7 @@
         ;; r is a boxed object containing a coll.
         ;; we must convert it to a coll of boxed objects.
         ;; we can use map* for process the boxed value.
-        (let [stlipped (stlip-default-keys boxed)]
+        (let [stlipped (strip-default-keys boxed)]
           (if (failure? r)
             (-> (merge stlipped r)
                 (map->Box))
@@ -239,7 +239,7 @@
       (catch Throwable th
         (if throw?
           (throw th)
-          (-> (stlip-default-keys boxed)
+          (-> (strip-default-keys boxed)
               (merge (failure th))
               (map->Box)))))))
 
