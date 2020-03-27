@@ -14,13 +14,13 @@ You can wrap any value with `box/value`, and transform it's value with `box/map`
 A boxed value is derefable by `deref` or `@`.
 
 ```clojure
-(require '[databox.core :as box])
+(require '[databox.core :as box] '[clojure.string :as string])
 (let [boxed (box/value :a)]
   (-> boxed
       (box/map name)
       (box/map string/upper-case)
       (deref)))
-;; A
+;; "A"
 ```
 
 `box/value` never be nested. If you call `box/value` on a already boxed data, `box/value` returns the data unchanged.
@@ -40,9 +40,9 @@ If you wrap a throwable object with `box/value`, the box become a `box/failure` 
 All transformers like `box/map` will convert a normal value to boxed value automatically, so you can pass any value to the transformers in safe.
 
 ```clojure
-(let [data (box/map name :a)]
+(let [data (box/map :a name)] ; :a is not a boxed data.
   (assert (true? (box/box? data)))
-  (assert (= "A" @data)))
+  (assert (= "a" @data)))
 ```
 
 Transformers are transducers.
@@ -61,7 +61,7 @@ All transformers ignore failure-boxed data. You don't need to care that if seque
 with sequence:
 
 ```clojure
-(let [data-call [(box/value :a) (box/failure (ex-info "error" {})) (box/value :c)]]
+(let [data-coll [(box/value :a) (box/failure (ex-info "error" {})) (box/value :c)]
       converted (sequence (box/map name) data-coll)] ;; No exception because failure-box is ignored by box/map
   (doseq [boxed converted]
     (println @boxed))) ;; will thow an exception when the second item is unwrapped.
@@ -70,7 +70,8 @@ with sequence:
 with channels:
 
 ```clojure
-(let [ch (pipe my-channel
+(let [my-channel (chan)
+      ch (pipe my-channel
                (chan 1 (box/map name)))] ;; You can connect a tranformer as a transducer to a channel.
   (go
     ;; Here we send a (boxed) throwable to a channel and it will be transformed by `box/map`, 
@@ -78,30 +79,33 @@ with channels:
     ;; We can apply box transformers on channel pipelines in safe.
     (onto-chan my-channel [(box/value :a) (box/value (ex-info "error" {})) (box/value :c)]))
     
-  (go
-    (let [data (<! ch)]
+  (go-loop []
+    (when-let [data (<! ch)]
       ;; all exceptions will be thrown when it derefed.
       ;; so all errors in channel pipelines never be thrown IN pipeline, 
       ;; but be thrown at the END of pipeline. 
-      (println @data))))
+      (println @data)
+      (recur))))
 ```
 
 You can not only convert a data by box/map, but can do filter, mapcat and distinct them.
 
 ```clojure
-(let [ch (-> mychannel
+(let [mychannel (chan)
+      ch (-> mychannel
              ;; string/split returns a seq of string and the each string will be boxed by `box/mapcat`
-             (pipe (chan 1 (box/mapcat #(string/split % ",")))) 
+             (pipe (chan 1 (box/mapcat #(string/split % #",")))) 
              ;; all "a" are removed
-             (pipe (chan 1 (box/filter #(not= "a"))))
+             (pipe (chan 1 (box/filter #(not= "a" %))))
              ;; all duplicated items will be removed
              (pipe (chan 1 (box/distinct))))]
   (go
     (>! mychannel (box/value "a,b,a,c,c,b,d")))
     
-  (go
-    (let [item (<! ch)]
-      (println item))))
+  (go-loop []
+    (when-let [item (<! ch)]
+      (println @item)
+      (recur))))
       
 ;; b
 ;; c

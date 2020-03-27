@@ -1,10 +1,8 @@
 (ns databox.core
   (:refer-clojure :exclude [map mapcat filter distinct])
-  (:require [clojure.core :as core]
-            [clojure.pprint :refer [simple-dispatch]]))
+  (:require [clojure.core :as core]))
 
-(declare map* mapcat* value failure unbox box? failure? success-value)
-
+(declare map* mapcat* value failure unbox box? success? failure? success-value exception)
 
 (defn- handle-boxed-data
   [boxed-data]
@@ -26,11 +24,15 @@
   clojure.lang.IBlockingDeref
   (deref [box ms timeout-value] (handle-boxed-data box)))
 
+(defmethod print-method Box [v ^java.io.Writer w]
+  (if (success? v)
+    (.write w (str "Success[" (pr-str (success-value v)) "]"))
+    (.write w (str "Failure[" (pr-str (exception v)) "]"))))
+
 (defn map
   [data & args]
   (cond
     ;; transducer
-
     (fn? data)
     (let [f data
           [options & _] args]
@@ -133,14 +135,10 @@
                (do (vswap! seen conj v)
                    (rf result boxed))))))))))
 
-(prefer-method print-method java.util.Map clojure.lang.IDeref)
-(prefer-method simple-dispatch java.util.Map clojure.lang.IDeref)
-
 (defn success
   [value]
   (map->Box {:type :success
              :result value}))
-
 
 (defn failure
   [ex]
