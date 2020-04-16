@@ -23,7 +23,10 @@ A boxed value is derefable by `deref` or `@`.
 ;; "A"
 ```
 
-`box/value` never be nested. If you call `box/value` on a already boxed data, `box/value` returns the data unchanged.
+All exceptions occurred in transformers like `box/map`, `box/filter` aren't thrown, but converted as failure box. And transformers ignore failure box. So we can handle boxed data in channel pipeline without any care of exceptions. Just throw them. Transformer functions never called on failure box and thrown exceptions in transformers automatically converted to failure box. The wrapped exception in failure box will be thrown when the box is dereferenced.
+
+
+`box/value` never be nested. If you call `box/value` on already boxed data, `box/value` returns the data unchanged.
 
 ```clojure
 (let [boxed (box/value :a)]
