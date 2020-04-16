@@ -11,9 +11,7 @@
     (:result boxed-data)
 
     :failure
-    (throw (ex-info "Unboxed a failed result."
-                    (dissoc boxed-data :type :exception)
-                    (:exception boxed-data)))))
+    (throw (:exception boxed-data))))
 
 (defrecord Box
   [type]
