@@ -225,11 +225,11 @@
         ;; r is a boxed object containing a coll.
         ;; we must convert it to a coll of boxed objects.
         ;; we can use map* for process the boxed value.
-        (let [stlipped (strip-default-keys boxed)]
+        (let [stripped (strip-default-keys boxed)]
           (if (failure? r)
-            (-> (merge stlipped r)
+            (-> (merge stripped r)
                 (map->Box))
-            (unbox (map* r (fn [coll] (core/map #(-> stlipped
+            (unbox (map* r (fn [coll] (core/map #(-> stripped
                                                      (merge r)
                                                      (assoc :result %)
                                                      (map->Box))
