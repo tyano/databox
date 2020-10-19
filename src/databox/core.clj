@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [map mapcat filter distinct])
   (:require [clojure.core :as core]))
 
-(declare map* mapcat* value failure unbox box? success? failure? success-value exception)
+(declare map* mapcat* box failure unbox box? success? failure? success-value exception)
 
 (defn- handle-boxed-data
   [boxed-data]
@@ -39,13 +39,13 @@
           ([] (rf))
           ([result] (rf result))
           ([result v]
-           (let [new-value (map* (value v) f options)]
+           (let [new-value (map* (box v) f options)]
              (rf result new-value))))))
 
     :else
     (let [obj data
           [f & [options]] args]
-      (map* (value obj) f options))))
+      (map* (box obj) f options))))
 
 
 (defn mapcat
@@ -60,7 +60,7 @@
           ([] (rf))
           ([result] (rf result))
           ([result v]
-           (let [new-values (mapcat* (value v) f options)]
+           (let [new-values (mapcat* (box v) f options)]
              (reduce
               #(let [ret (rf %1 %2)]
                  (if (reduced? ret)
@@ -72,7 +72,7 @@
     :else
     (let [obj data
           [f & [options]] args]
-      (mapcat* (value obj) f options))))
+      (mapcat* (box obj) f options))))
 
 
 (defn filter
@@ -87,8 +87,8 @@
          (failure? input)
          (rf result input)
 
-         (pred (success-value (value input)))
-         (rf result (value input))
+         (pred (success-value (box input)))
+         (rf result (box input))
 
          :else
          result)))))
@@ -106,7 +106,7 @@
            (rf result input)
 
            :else
-           (let [boxed (value input)
+           (let [boxed (box input)
                  v (success-value boxed)]
              (if (contains? @seen v)
                result
@@ -126,7 +126,7 @@
            (rf result input)
 
            :else
-           (let [boxed (value input)
+           (let [boxed (box input)
                  v (f (success-value boxed))]
              (if (contains? @seen v)
                result
@@ -145,17 +145,17 @@
 
 (defn success-value
   [v]
-  (:result (value v)))
+  (:result (box v)))
 
 (defn exception
   [v]
-  (:exception (value v)))
+  (:exception (box v)))
 
 (defn box?
-  [box]
-  (instance? Box box))
+  [boxed]
+  (instance? Box boxed))
 
-(defn value
+(defn box
   [v]
   (cond
     (box? v)
@@ -167,6 +167,8 @@
     :else
     (success v)))
 
+(def ^:deprecated value box)
+
 (defn unbox
   [v]
   (if (box? v)
@@ -174,12 +176,12 @@
     v))
 
 (defn success?
-  [box]
-  (= (:type box) :success))
+  [boxed]
+  (= (:type boxed) :success))
 
 (defn failure?
-  [box]
-  (= (:type box) :failure))
+  [boxed]
+  (= (:type boxed) :failure))
 
 
 (defn strip-default-keys
@@ -195,7 +197,7 @@
 
     (try
       (let [unboxed (unbox boxed)
-            r (value (f unboxed))]
+            r (box (f unboxed))]
         ;; we must keep keys assigned on a original boxed value.
         ;; so remove all default keys of Boxed instance from a original
         ;; boxed value and merge a new boxed instance on it.
@@ -219,7 +221,7 @@
 
     (try
       (let [unboxed (unbox boxed)
-            r (value (f unboxed))]
+            r (box (f unboxed))]
         ;; r is a boxed object containing a coll.
         ;; we must convert it to a coll of boxed objects.
         ;; we can use map* for process the boxed value.
@@ -247,7 +249,7 @@
         body (if has-opts? (drop 2 args) (drop 1 args))
         v (first binding)
         boxed (second binding)]
-    `(map (value ~boxed)
+    `(map (box ~boxed)
           (fn [~v]
             (do ~@body))
           ~opts)))
