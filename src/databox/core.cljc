@@ -1,6 +1,7 @@
 (ns databox.core
-  (:refer-clojure :exclude [map mapcat filter distinct])
-  (:require [clojure.core :as core]))
+  (:refer-clojure :exclude [map mapcat filter distinct Box ->Box])
+  (:require #?(:clj  [clojure.core :as core]
+               :cljs [cljs.core :as core])))
 
 (declare map* mapcat* box failure unbox box? success? failure? success-value exception)
 
@@ -13,19 +14,24 @@
     :failure
     (throw (:exception boxed-data))))
 
-(defrecord Box
-  [type]
+#?(:clj
+   (defrecord Box [type]
+     clojure.lang.IDeref
+     (deref [box] (handle-boxed-data box))
 
-  clojure.lang.IDeref
-  (deref [box] (handle-boxed-data box))
+     clojure.lang.IBlockingDeref
+     (deref [box ms timeout-value] (handle-boxed-data box)))
+   
+   :cljs
+   (defrecord Box [type]
+     IDeref
+     (-deref [box] (handle-boxed-data box))))
 
-  clojure.lang.IBlockingDeref
-  (deref [box ms timeout-value] (handle-boxed-data box)))
-
-(defmethod print-method Box [v ^java.io.Writer w]
-  (if (success? v)
-    (.write w (str "Success[" (pr-str (success-value v)) "]"))
-    (.write w (str "Failure[" (pr-str (exception v)) "]"))))
+#?(:clj
+   (defmethod print-method Box [v ^java.io.Writer w]
+     (if (success? v)
+       (.write w (str "Success[" (pr-str (success-value v)) "]"))
+       (.write w (str "Failure[" (pr-str (exception v)) "]")))))
 
 (defn map
   [data & args]
@@ -157,15 +163,24 @@
 
 (defn box
   [v]
-  (cond
-    (box? v)
-    v
+  #?(:clj
+     (cond
+       (box? v)
+       v
 
-    (instance? Throwable v)
-    (failure v)
+       (instance? Throwable v)
+       (failure v)
 
-    :else
-    (success v)))
+       :else
+       (success v))
+     
+     :cljs
+     (cond
+       (box? v)
+       v
+
+       :else
+       (success v))))
 
 (def ^:deprecated value box)
 
@@ -205,7 +220,7 @@
             (merge r)
             (map->Box)))
 
-      (catch Throwable th
+      (catch #?(:clj Throwable :cljs :default) th
         (if throw?
           (throw th)
           (-> (strip-default-keys boxed)
@@ -234,7 +249,7 @@
                                                      (assoc :result %)
                                                      (map->Box))
                                                 coll)))))))
-      (catch Throwable th
+      (catch #?(:clj Throwable :cljs :default) th
         (if throw?
           (throw th)
           (-> (strip-default-keys boxed)
