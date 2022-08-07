@@ -235,20 +235,20 @@
       boxed)
 
     (try
+      ;; r is a boxed object containing a coll.
+      ;; we must convert it to a coll of boxed objects.
+      ;; we can use map* for processing the boxed value.
       (let [unboxed (unbox boxed)
-            r (box (f unboxed))]
-        ;; r is a boxed object containing a coll.
-        ;; we must convert it to a coll of boxed objects.
-        ;; we can use map* for process the boxed value.
-        (let [stripped (strip-default-keys boxed)]
-          (if (failure? r)
-            (-> (merge stripped r)
-                (map->Box))
-            (unbox (map* r (fn [coll] (core/map #(-> stripped
-                                                     (merge r)
-                                                     (assoc :result %)
-                                                     (map->Box))
-                                                coll)))))))
+            r (box (f unboxed))
+            stripped (strip-default-keys boxed)]
+        (if (failure? r)
+          (-> (merge stripped r)
+              (map->Box))
+          (unbox (map* r (fn [coll] (core/map #(-> stripped
+                                                   (merge r)
+                                                   (assoc :result %)
+                                                   (map->Box))
+                                              coll))))))
       (catch #?(:clj Throwable :cljs :default) th
         (if throw?
           (throw th)
