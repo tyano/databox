@@ -1,5 +1,5 @@
 (ns databox.core
-  (:refer-clojure :exclude [map mapcat filter distinct Box ->Box])
+  (:refer-clojure :exclude [map mapcat filter distinct Box ->Box apply])
   (:require #?(:clj  [clojure.core :as core]
                :cljs [cljs.core :as core])))
 
@@ -32,6 +32,13 @@
      (if (success? v)
        (.write w (str "Success[" (pr-str (success-value v)) "]"))
        (.write w (str "Failure[" (pr-str (exception v)) "]")))))
+
+(defn apply
+  [v f & {failure-value :failure :or {failure-value nil}}]
+  (let [boxed (box v)]
+    (if (failure? boxed)
+      failure-value
+      (f (success-value boxed)))))
 
 (defn map
   [data & args]
