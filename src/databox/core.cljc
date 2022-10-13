@@ -1,7 +1,8 @@
 (ns databox.core
   (:refer-clojure :exclude [map mapcat filter distinct Box ->Box apply])
   (:require #?(:clj  [clojure.core :as core]
-               :cljs [cljs.core :as core])))
+               :cljs [cljs.core :as core])
+            #?(:clj [clojure.pprint :as pp])))
 
 (declare map* mapcat* box failure unbox box? success? failure? success-value exception)
 
@@ -33,11 +34,32 @@
        (.write w (str "Success[" (pr-str (success-value v)) "]"))
        (.write w (str "Failure[" (pr-str (exception v)) "]")))))
 
+#?(:clj
+   (prefer-method pp/simple-dispatch clojure.lang.IPersistentMap clojure.lang.IDeref))
+
+(defn disable
+  [boxed]
+  (assoc (box boxed) ::disabled true))
+
+(defn enable
+  [boxed]
+  (dissoc (box boxed) ::disabled))
+
+(defn disabled?
+  [boxed]
+  (true? (::disabled boxed)))
+
 (defn apply
   [v f & {failure-value :failure :or {failure-value nil}}]
   (let [boxed (box v)]
-    (if (failure? boxed)
+    (cond
+      (failure? boxed)
       failure-value
+
+      (disabled? boxed)
+      (success-value boxed)
+
+      :else
       (f (success-value boxed)))))
 
 (defn map
@@ -52,13 +74,19 @@
           ([] (rf))
           ([result] (rf result))
           ([result v]
-           (let [new-value (map* (box v) f options)]
+           (let [boxed (box v)
+                 new-value (if (disabled? boxed)
+                             boxed
+                             (map* boxed f options))]
              (rf result new-value))))))
 
     :else
     (let [obj data
-          [f & [options]] args]
-      (map* (box obj) f options))))
+          [f & [options]] args
+          boxed (box obj)]
+      (if (disabled? boxed)
+        boxed
+        (map* boxed f options)))))
 
 
 (defn mapcat
@@ -73,7 +101,10 @@
           ([] (rf))
           ([result] (rf result))
           ([result v]
-           (let [new-values (mapcat* (box v) f options)]
+           (let [boxed (box v)
+                 new-values (if (disabled? boxed)
+                              [boxed]
+                              (mapcat* boxed f options))]
              (reduce
               #(let [ret (rf %1 %2)]
                  (if (reduced? ret)
@@ -84,8 +115,11 @@
 
     :else
     (let [obj data
-          [f & [options]] args]
-      (mapcat* (box obj) f options))))
+          [f & [options]] args
+          boxed (box obj)]
+      (if (disabled? boxed)
+        boxed
+        (mapcat* boxed f options)))))
 
 
 (defn filter
@@ -96,15 +130,19 @@
       ([] (rf))
       ([result] (rf result))
       ([result input]
-       (cond
-         (failure? input)
-         (rf result input)
+       (let [boxed (box input)]
+         (cond
+           (failure? boxed)
+           (rf result boxed)
 
-         (pred (success-value (box input)))
-         (rf result (box input))
+           (disabled? boxed)
+           (rf result boxed)
 
-         :else
-         result)))))
+           (pred (success-value boxed))
+           (rf result boxed)
+
+           :else
+           result))))))
 
 (defn distinct
   []
@@ -114,17 +152,20 @@
         ([] (rf))
         ([result] (rf result))
         ([result input]
-         (cond
-           (failure? input)
-           (rf result input)
+         (let [boxed (box input)]
+           (cond
+             (failure? boxed)
+             (rf result boxed)
 
-           :else
-           (let [boxed (box input)
-                 v (success-value boxed)]
-             (if (contains? @seen v)
-               result
-               (do (vswap! seen conj v)
-                   (rf result boxed))))))))))
+             (disabled? boxed)
+             (rf result boxed)
+
+             :else
+             (let [v (success-value boxed)]
+               (if (contains? @seen v)
+                 result
+                 (do (vswap! seen conj v)
+                     (rf result boxed)))))))))))
 
 (defn distinct-by
   [f]
@@ -134,17 +175,20 @@
         ([] (rf))
         ([result] (rf result))
         ([result input]
-         (cond
-           (failure? input)
-           (rf result input)
+         (let [boxed (box input)]
+           (cond
+             (failure? boxed)
+             (rf result boxed)
 
-           :else
-           (let [boxed (box input)
-                 v (f (success-value boxed))]
-             (if (contains? @seen v)
-               result
-               (do (vswap! seen conj v)
-                   (rf result boxed))))))))))
+             (disabled? boxed)
+             (rf result boxed)
+
+             :else
+             (let [v (f (success-value boxed))]
+               (if (contains? @seen v)
+                 result
+                 (do (vswap! seen conj v)
+                     (rf result boxed)))))))))))
 
 (defn success
   [value]
@@ -221,8 +265,9 @@
       (let [unboxed (unbox boxed)
             r (box (f unboxed))]
         ;; we must keep keys assigned on a original boxed value.
-        ;; so remove all default keys of Boxed instance from a original
-        ;; boxed value and merge a new boxed instance on it.
+        ;; So copy all values of a new boxed data to the original box.
+        ;; But remove all default keys of Boxed instance from a original box
+        ;; before merging (aka initialize).
         (-> (strip-default-keys boxed)
             (merge r)
             (map->Box)))
