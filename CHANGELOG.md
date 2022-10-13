@@ -1,5 +1,8 @@
 # Change Log
-All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
+
+## [0.2.1] - 2022-10-13
+- Added 'apply' function for boxed data, with which users can apply a function onto a box and get the result value (not boxed).
+- Added 'disable' function for boxed data. All functions applied to disabled boxes are just ignored.
 
 ## [0.2.0] - 2022-04-25
 
