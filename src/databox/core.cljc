@@ -66,7 +66,7 @@
   [data & args]
   (cond
     ;; transducer
-    (fn? data)
+    (empty? args)
     (let [f data
           [options & _] args]
       (fn [rf]
@@ -93,7 +93,7 @@
   [data & args]
   (cond
     ;; transducer
-    (fn? data)
+    (empty? args)
     (let [f data
           [options & _] args]
       (fn [rf]
