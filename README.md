@@ -10,7 +10,7 @@ The latest version on Clojars.
 
 ## Usage
 
-You can wrap any value with `box/value`, and transform it's value with `box/map`, `box/filter`, `box/mapcat`. 
+You can wrap any value with `box/value`, and transform it's value with `box/map`, `box/filter`, `box/mapcat`.
 A boxed value is derefable by `deref` or `@`.
 
 ```clojure
@@ -48,7 +48,7 @@ All transformers like `box/map` will convert a normal value to boxed value autom
   (assert (= "a" @data)))
 ```
 
-Transformers are transducers.
+You can also use transformers as transducers.
 
 ```clojure
 (doseq [boxed (sequence (box/map name) [(box/value :a) (box/value :b) (box/value :c)])]
@@ -77,16 +77,16 @@ with channels:
       ch (pipe my-channel
                (chan 1 (box/map name)))] ;; You can connect a tranformer as a transducer to a channel.
   (go
-    ;; Here we send a (boxed) throwable to a channel and it will be transformed by `box/map`, 
-    ;; But `box/map` ignores all error data so exception never be thrown. 
+    ;; Here we send a (boxed) throwable to a channel and it will be transformed by `box/map`,
+    ;; But `box/map` ignores all error data so exception never be thrown.
     ;; We can apply box transformers on channel pipelines in safe.
     (onto-chan my-channel [(box/value :a) (box/value (ex-info "error" {})) (box/value :c)]))
-    
+
   (go-loop []
     (when-let [data (<! ch)]
       ;; all exceptions will be thrown when it derefed.
-      ;; so all errors in channel pipelines never be thrown IN pipeline, 
-      ;; but be thrown at the END of pipeline. 
+      ;; so all errors in channel pipelines never be thrown IN pipeline,
+      ;; but be thrown at the END of pipeline.
       (println @data)
       (recur))))
 ```
@@ -97,19 +97,19 @@ You can not only convert a data by box/map, but can do filter, mapcat and distin
 (let [mychannel (chan)
       ch (-> mychannel
              ;; string/split returns a seq of string and the each string will be boxed by `box/mapcat`
-             (pipe (chan 1 (box/mapcat #(string/split % #",")))) 
+             (pipe (chan 1 (box/mapcat #(string/split % #","))))
              ;; all "a" are removed
              (pipe (chan 1 (box/filter #(not= "a" %))))
              ;; all duplicated items will be removed
              (pipe (chan 1 (box/distinct))))]
   (go
     (>! mychannel (box/value "a,b,a,c,c,b,d")))
-    
+
   (go-loop []
     (when-let [item (<! ch)]
       (println @item)
       (recur))))
-      
+
 ;; b
 ;; c
 ;; d
@@ -124,7 +124,7 @@ maplet is a syntax sugar of `box/map`.
 ```
 
 If you don't certain it a value is boxed or normal value, you can deref it with `box/unbox` in safe.
-`box/unbox` returns an unboxed (derefed) value or the value itself if the value is not boxed. 
+`box/unbox` returns an unboxed (derefed) value or the value itself if the value is not boxed.
 
 ```clojure
 (box/unbox :a)
@@ -156,6 +156,43 @@ If you need the exception wrapped in a boxed data, you can use `box/exception`.
 (box/box? (box/value :a)) ; => true
 (box/box? :a) ; => false
 ```
+
+You cat apply a function to the value contained in a databox by using box/apply fn.
+
+```clojure
+(box/apply (box/success :a) name)
+;=> "a"
+```
+
+If you use the 'box/apply' onto a failure box, it just returns a nil, or the :failure value of option map.
+
+```clojure
+(box/apply (box/failure (ex-info "Test Exception" {})) name)
+;;=> nil
+
+(box/apply (box/failure (ex-info "Test Exception" {})) name :failure :error)
+;;=> :error
+```
+
+## Disable databox
+
+You can 'disable' or 'enable' databoxes.
+Disabled boxes never accept tranformers even if it is not failure-boxes.
+
+You can disable a box by `box/disable`.
+
+```clojure
+(box/map (box/disable (box/success :a)) name)
+;=> (box/success :a)
+```
+
+And enable the disabled box by `box/enable`.
+
+```clojure
+(def disabled (box/disable (box/success :a)))
+(box/enable disabled) ;=> returns (box/success :a) that is not disabled.
+```
+
 
 
 ## License
