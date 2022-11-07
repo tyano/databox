@@ -207,3 +207,23 @@
                             {:data 3 :type :one}
                             {:data 3 :type :two}
                             {:data 3 :type :three}]))))))
+
+(deftest apply-test
+  (is (= "a"
+         (box/apply (box/success :a) name)))
+
+  (is (nil? (box/apply (box/failure (ex-info "Test Error" {})) name)))
+
+  (is (= :error
+         (box/apply (box/failure (ex-info "Test Error" {})) name :failure :error))))
+
+
+(deftest disable-test
+  (let [disabled-box (-> (box/success :a) (box/disable))]
+    (is (= disabled-box
+           (box/map disabled-box name)))))
+
+(deftest enable-test
+  (let [disabled-box (-> (box/success :a) (box/disable))]
+    (is (= (box/success "a")
+           (box/map (box/enable disabled-box) name)))))
